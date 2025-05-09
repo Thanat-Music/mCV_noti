@@ -16,8 +16,11 @@ class MCvnoti:
         driver = webdriver.Chrome(options=chrome_options)
         return driver
 
-    def login(self, username, password):
-        self.driver.get("https://www.mycourseville.com/api/oauth/authorize?response_type=code&client_id=mycourseville.com&redirect_uri=https://www.mycourseville.com&login_page=itchula")
+    def login(self, username, password,is_alpha = False):
+        if is_alpha:
+            self.driver.get("https://alpha.mycourseville.com/api/oauth/authorize?response_type=code&client_id=raZMrnZyw8hQAoFwjkzMV6hvoqd8bvcDD5HdfeJx&redirect_uri=https://alpha.mycourseville.com/&state=/course")
+        else:
+            self.driver.get("https://www.mycourseville.com/api/oauth/authorize?response_type=code&client_id=mycourseville.com&redirect_uri=https://www.mycourseville.com&login_page=itchula")
         username_field = self.driver.find_element(By.NAME, "username")
         password_field = self.driver.find_element(By.NAME, "password")
         login_button = self.driver.find_element(By.XPATH, "//button[@type='submit']")
