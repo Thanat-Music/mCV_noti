@@ -5,7 +5,7 @@ from linebot.models import TextSendMessage, ImageSendMessage
 from linebot.exceptions import LineBotApiError
 
 
-channel_acc_token = "lYZPXb044qOS9XLZB5vBtBHzym24Z7vj7fC0096L4Bi8iM84BEeJjQdpgW3EOW9nPV60wyOV8KO8JnuIaou4zZoQJkbUMm/whlSwg9Hqm5QbpNla9hEsnNM3UyZAaUoBzoRe8YqwrQyrfpgpv9VPrgdB04t89/1O/w1cDnyilFU="
+channel_acc_token = ACC_TOKEN
 line_bot_api = LineBotApi(channel_acc_token)
 
 

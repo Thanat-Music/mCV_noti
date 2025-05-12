@@ -58,8 +58,8 @@ def main():
         # Step 4: POST login form
         login_data = {
             '_token': token,
-            'username': ***REMOVED***,
-            'password': ***REMOVED***,  # Replace with actual password
+            'username': uid,
+            'password': passw,  # Replace with actual password
             'remember': 'on'
         }
         
