@@ -64,7 +64,6 @@ class CVScraper:
             print(f"Login Page Status: {response.status_code}")
             print(f"Login Page Cookies: {self._get_cookie(response)}")
             print("--------------------------")
-        
         return response
     
     def _extract_csrf_token(self, login_page_response,show = False):
@@ -118,19 +117,12 @@ class CVScraper:
                 print("")
             # Step 1: Initial request
             self._get_homepage(show)
-            
-            # Step 2: Get login page
             login_page = self._get_login_page(show)
-            
-            # Step 3: Extract CSRF token
             token = self._extract_csrf_token(login_page,show)
             if not token:
                 return False
-                
-            # Step 4: Perform login
+            # Step 2: Perform login
             login_response = self._perform_login(token,show)
-            
-            # Check login success
             if login_response.status_code == 200:
                 if show:
                     print(f"Final Cookies: {self._get_cookie(True)}")
@@ -139,9 +131,7 @@ class CVScraper:
             else:
                 if show:
                     print(f"\nLogin failed! Status: {login_response.status_code}")
-                return False
-            
-                
+                return False  
         except requests.exceptions.RequestException as e:
             print(f"\nError occurred: {str(e)}")
             return False
@@ -152,10 +142,21 @@ class CVaScraper(CVScraper):
         super().__init__()
         self.run(False)
         self.client_id = self.get_client_id(False)
+        token = self.grant_token(False)
+        self.auth_token = token['access_token']
+        self.refresh_token = token['refresh_token']
+        
+    def _update_session_headers(self,auth_token=None):
+        self.session.headers.update({
+            'Authorization': f'Bearer {auth_token}',
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive',
+        })
+        
     
     def get_client_id(self,show = False):
         js_url = "https://alpha.mycourseville.com/assets/index-BT6DwrJv.js"
-
         #Download the JS file
         response = self.session.get(js_url)
         if show:
@@ -167,49 +168,63 @@ class CVaScraper(CVScraper):
         if match:
             return match.group(1)
         else:
-            print("!!!ALERT!!! client_id not found in script.")
-            return None
+            raise Exception("!!!ALERT!!! client_id not found in script.")
         
     @staticmethod
     def get_body_length(body):
-        return len(body.encode("utf-8"))
+        return len(str(body).encode("utf-8"))
 
     def grant_token(self,show = False):
         """Grant token to access Courseville API"""
-        if show:
-            print("Granting token...")
+        if show: print("Granting token...")
         url = f"https://www.mycourseville.com/api/oauth/authorize?response_type=code&client_id={self.client_id}&redirect_uri=https://alpha.mycourseville.com/&state=/course"
         response = self.session.get(url,allow_redirects=False)
         if response.status_code != 302:
-            print(f"!!!ALERT!!! Error: {response.status_code}")
-            return None
+            raise Exception(f"!!!ALERT!!! code extracttion Error: {response.status_code}")
         location = response.headers['Location']
-        # if show:
-        #     print(f"Response URL: {response.headers['Location']}")
-        code = re.search(r'[?&]code=([^&]+)', response.headers['Location']).group(1)
-        if show:
-            print(f"Code: {code}")
+        code = re.search(r'[?&]code=([^&]+)', location).group(1)    # Extract the code from the URL
+        if show: print(f"Code: {code}")
+        # Make a POST request to get the token
         api_url = "https://api.alpha.mycourseville.com/auth/login"
+        body = {"code": code}
         headers = {
             'Host': 'api.alpha.mycourseville.com',
-            'Content-Length': str(self.get_body_length(code)+11),
+            'Content-Length': str(self.get_body_length(body)),
             'Accept': 'application/json, text/plain, */*',
             'Content-Type': 'application/json'}
-        print(f"headers: {headers}")
-        token = requests.post(api_url,headers=headers, json={"code": code})
+        if show: print(f"headers: {headers}")
+        token = requests.post(api_url,headers=headers, json=body)
         if token.status_code == 200:
             token_data = json.loads(token.text)
-            if show:
-                print(f"Token: {token_data}")
+            if show: print(f"Token: {token_data}")
             return token_data
         else: 
-            print(f"!!!ALERT!!! Error: {token.status_code}")
-            print(f"!!!ALERT!!! Error: {token.text}")
-            return None
+            raise Exception(f"!!!ALERT!!! token granting Error: {token.status_code} \ntext: {token.text}")
+    
+    def query_assignment(self,semester = 1, year = 2023, filter ="ALL"):
+        """Query assignment data from Courseville API."""
+        playload = {
+            "query":"query AssignmentSummaryPageQuery($semester: String! $year: String! $filter: AssignmentFilter!) {...AssignmentSummaryFragment_bZQ9B}\
+                    fragment AssignmentSummaryFragment_bZQ9B on Query {\
+                    me {myCoursesBySemester(semester: $semester, year: $year) \
+                    {\
+                        student {\
+                            courseID title courseNumber courseYear thumbnail semester assignments(filter: $filter) \
+                                {courseID id title type status outDate dueDate}}}}}",
+            "variables":{"semester":semester,"year":year,"filter":filter}
+            }
+        headers = {'Authorization': f'Bearer {self.auth_token}',
+                'Content-Type': 'application/json',
+                'Content-Length': str(CVaScraper.get_body_length(playload))}
 
+        data_res = self.session.post("https://api.alpha.mycourseville.com/query",headers=headers,json=playload)
+        if data_res.status_code == 200:
+            return data_res.json()
+        else:
+            raise Exception(f"!!!ALERT!!! query assignment Error: {data_res.status_code} \n text: {data_res.text}")
 
 if __name__ == "__main__":
     scraper = CVaScraper()
     print(scraper.get_client_id(True))
     scraper.grant_token(True)
-
+    print(scraper.query_assignment(semester = 1, year = 2023, filter ="ALL"))
