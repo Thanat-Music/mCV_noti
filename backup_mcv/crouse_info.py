@@ -1,9 +1,9 @@
-from noticv import MCvnoti
+from mcv_backup import MCvnoti
 from selenium.webdriver.common.by import By
 import time
 
 engine = MCvnoti(show = True)
-engine.login('uid','passwd')
+engine.login('uid','passw')
 engine.driver.get("https://www.mycourseville.com/api/oauth/authorize?response_type=code&client_id=raZMrnZyw8hQAoFwjkzMV6hvoqd8bvcDD5HdfeJx&redirect_uri=https://alpha.mycourseville.com/&state=/course")
 
 

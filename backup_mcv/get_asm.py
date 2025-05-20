@@ -1,11 +1,11 @@
-from noticv import MCvnoti
+from mcv_backup import MCvnoti
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 
 engine = MCvnoti(show = True)
-engine.login(***REMOVED***,***REMOVED***)
+engine.login('***REMOVED***','***REMOVED***')
 engine.driver.get("https://www.mycourseville.com/api/oauth/authorize?response_type=code&client_id=raZMrnZyw8hQAoFwjkzMV6hvoqd8bvcDD5HdfeJx&redirect_uri=https://alpha.mycourseville.com/&state=/assignments")
 
 
