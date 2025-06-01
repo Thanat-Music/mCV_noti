@@ -227,4 +227,4 @@ if __name__ == "__main__":
     scraper = CVaScraper()
     print(scraper.get_client_id(True))
     scraper.grant_token(True)
-    print(scraper.query_assignment(semester = 1, year = 2023, filter ="ALL"))
+    print(scraper.query_assignment(semester = 1, year = 2024, filter ="ALL"))
