@@ -1,0 +1,118 @@
+{
+"type": "box",
+"layout": "vertical",
+"contents": [
+    {
+    "type": "text",
+    "text": "<ASSIGNMENT_NAME>",
+    "margin": "md",
+    "weight": "regular",
+    "gravity": "center",
+    "position": "relative",
+    "align": "start",
+    "size": "xl",
+    "flex": 10,
+    "wrap": true
+    },
+    {
+    "type": "box",
+    "layout": "baseline",
+    "contents": [
+        {
+        "type": "text",
+        "text": "Due date:",
+        "flex": 1,
+        "color": "#6a7585",
+        "margin": "none",
+        "size": "md",
+        "weight": "bold"
+        },
+        {
+        "type": "text",
+        "text": "<DUE_DATE>",
+        "flex": 2,
+        "color": "#2d3138",
+        "size": "md",
+        "weight": "regular",
+        "wrap": true
+        }
+    ],
+    "spacing": "lg",
+    "margin": "lg"
+    },
+    {
+    "type": "box",
+    "layout": "baseline",
+    "contents": [
+        {
+        "type": "text",
+        "text": "Time left:",
+        "flex": 1,
+        "color": "#6a7585",
+        "margin": "none",
+        "size": "md",
+        "weight": "bold"
+        },
+        {
+        "type": "text",
+        "text": "<TIME_LEFT>",
+        "flex": 2,
+        "color": "<TIME_LEFT_COLOR>",
+        "weight": "<TIME_LEFT_WEIGHT>",
+        "size": "<TIME_LEFT_SIZE>",
+        "wrap": true
+        }
+    ],
+    "spacing": "lg"
+    },
+    {
+    "type": "box",
+    "layout": "horizontal",
+    "contents": [
+        {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+            "type": "text",
+            "text": "<STATUS_TEXT>",
+            "gravity": "center",
+            "size": "md",
+            "color": "#FFFFFF",
+            "position": "relative",
+            "align": "center",
+            "flex": 1
+            }
+        ],
+        "backgroundColor": "<STATUS_BG_COLOR>",
+        "cornerRadius": "xxl",
+        "flex": 3,
+        "paddingEnd": "none",
+        "margin": "none",
+        "spacing": "none",
+        "position": "relative",
+        "justifyContent": "center"
+        },
+        {
+        "type": "filler",
+        "flex": 1
+        },
+        {
+        "type": "button",
+        "style": "primary",
+        "height": "sm",
+        "action": {
+            "type": "uri",
+            "label": "Detail",
+            "uri": "<DETAIL_URL>"
+        },
+        "color": "#1d63b9",
+        "margin": "lg",
+        "flex": 2
+        }
+    ],
+    "margin": "lg"
+    }
+],
+"margin": "lg"
+}
