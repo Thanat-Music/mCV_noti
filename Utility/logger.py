@@ -1,6 +1,6 @@
 import sqlite3
 
-DB_PATH = "database/main.db"
+DB_PATH = "database/log.db"
 
 def log(level, source, message, data=None):
     conn = sqlite3.connect(DB_PATH)
