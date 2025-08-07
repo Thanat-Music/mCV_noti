@@ -120,8 +120,8 @@ class DBManager:
             JOIN assignment a ON ua.assignment_id = a.assignment_id
             JOIN course c ON a.course_id = c.course_id
             WHERE 
-                datetime(a.due_date) >= datetime('now')
-                AND datetime(a.due_date) <= datetime('now', '+7 days')
+                datetime(a.due_date) >= datetime('now', '+7 hours')
+                AND datetime(a.due_date) <= datetime('now', '+7 days', '+7 hours')
                 AND ua.user_id = ?;
         """
         self.cur.execute(query,(user_id,))
@@ -139,8 +139,8 @@ class DBManager:
             JOIN assignment a ON ua.assignment_id = a.assignment_id
             JOIN user u ON ua.user_id = u.user_id
             WHERE 
-                datetime(a.due_date) >= datetime('now')
-                AND datetime(a.due_date) <= datetime('now', '+3 days')
+                datetime(a.due_date) >= datetime('now', '+7 hours')
+                AND datetime(a.due_date) <= datetime('now', '+3 days', '+7 hours')
                 AND (ua.notify_3d = FALSE OR ua.notify_1d = FALSE);
         """
         self.cur.execute(query)

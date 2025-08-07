@@ -149,7 +149,7 @@ def get_assignment_state(assignment_status: str, total_seconds_left: int) -> str
     Returns:
         str: State identifier for styling
     """
-    print(f"Assignment Status: {assignment_status}, Total Seconds Left: {total_seconds_left}")
+
     if assignment_status == "SUBMITTED":
         return "submitted_on_time"
     elif assignment_status == "OVERDUE":

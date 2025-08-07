@@ -1,4 +1,3 @@
-from collections import defaultdict
 from database.DB_manager import DBManager
 from notifier.line_ import LineBot
 from Utility.utility import *
@@ -259,6 +258,7 @@ if __name__ == "__main__":
             db.Update_notify(uid, assignment_id, True, True)
             info("notify_engine", f"Updated 1-day notification for user: {uid}, assignment: {assignment_id}")
         else:
-            warn("notify_engine", f"No assignment data found for user: {uid}")
+            info("notify_engine", f"No assignment data found for user: {uid}")
+    db.commit()
     db.close()
     info("notify_engine", "Notification engine finished processing.")
