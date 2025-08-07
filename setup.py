@@ -60,7 +60,7 @@ conn = sqlite3.connect("database/log.db")
 cur = conn.cursor()
 cur.execute("""CREATE TABLE log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+    timestamp TEXT DEFAULT (datetime('now', '+7 hours')),
     level TEXT,          -- INFO, WARNING, ERROR, DEBUG
     source TEXT,        
     message TEXT,
