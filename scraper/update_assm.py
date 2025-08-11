@@ -38,6 +38,7 @@ def get_assingment(cname,cpass):
 
 if __name__ == "__main__":
     db = DBManager()
+    print(f"{datetime.now()}: Starting assignment update process...")
     try:
         # Connect to the SQLite database
         conn = sqlite3.connect("database/main.db")
@@ -54,19 +55,19 @@ if __name__ == "__main__":
             try:
                 assignments_data = get_assingment(cname,cpass)
                 if not assignments_data:
-                    warn("update_assm", f"No assignment data found for user: {user_id}")
+                    warn("update_assm", f"NO data from mCV for user: {user_id}")
                     continue
             except Exception as e:
-                error("update_assm", f"Error fetching assignments for user {user_id}: {e}")
+                error("update_assm", f"Error fetching from mCV {user_id}",e)
                 continue
             for course in assignments_data:
                 db.upsert_course(course)
                 for a in course["assignments"]:
                     db.upsert_assignment(a)
                     db.assign_to_users(user_id,a["id"],a["status"])
-        info("update_assm", "Assignments updated successfully for all users.")
+        info("update_assm", "Assignments updated successfully")
     except sqlite3.Error as e:
-        error("update_assm", f"SQLite error: {e}")
+        error("update_assm", f"SQLite error",e)
     except Exception as e:
         error("update_assm", f"Error during assignment update: {e}")
     finally:

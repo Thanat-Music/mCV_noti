@@ -4,6 +4,7 @@ from Utility.utility import *
 from Utility.logger import info, warn, error
 import os
 import pytz
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -220,7 +221,7 @@ def create_crouse_flex_bubble(course_data: dict) ->  tuple[dict,str]:
     return bubble,alt
 
 if __name__ == "__main__":
-    info("notify_engine", "Starting notification engine...")
+    print(f"{datetime.now()}: Starting notification engine")
     db = DBManager()
     try: 
         users = get_notify_user(db)
@@ -235,11 +236,15 @@ if __name__ == "__main__":
         try:
             assignment_data = fetch_assignment_data(db, uid)
         except Exception as e:
-            error("notify_engine", f"Failed to fetch assignment data for user {uid}: {e}")
+            error("notify_engine", f"Failed to fetch assignment from DB for user {uid}", e)
             continue
         if assignment_data:
             try:
                 messages = process_course_data(assignment_data)
+            except Exception as e:
+                error("notify_engine", f"Failed to create message for {uid}", e)
+                continue
+            try:
                 if messages:
                     line_bot = LineBot(access_token, channel_secret)
                     for i in range(0,len(messages),5):
@@ -249,16 +254,16 @@ if __name__ == "__main__":
                     warn("notify_engine", f"No valid messages to send for user: {uid}")
                 info("notify_engine", f"Send {len(messages)} messages to user: {uid}")
             except Exception as e:
-                error("notify_engine", f"Failed to process course data for user {uid}: {e}")
+                error("notify_engine", f"Failed to send message to user {uid}", {e})
                 continue
         for assignment_id in users[uid]["d3"]:
             db.Update_notify(uid, assignment_id, True, False)
-            info("notify_engine", f"Updated 3-day notification for user: {uid}, assignment: {assignment_id}")
+            info("notify_engine", f"Updated 3-day noti for user: {uid}, assignment: {assignment_id}")
         for assignment_id in users[uid]["d1"]:
             db.Update_notify(uid, assignment_id, True, True)
-            info("notify_engine", f"Updated 1-day notification for user: {uid}, assignment: {assignment_id}")
+            info("notify_engine", f"Updated 1-day noti for user: {uid}, assignment: {assignment_id}")
         else:
-            info("notify_engine", f"No assignment data found for user: {uid}")
+            info("notify_engine", f"No upcoming assignment found for user: {uid}")
     db.commit()
     db.close()
     info("notify_engine", "Notification engine finished processing.")
