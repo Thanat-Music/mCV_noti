@@ -22,15 +22,18 @@ def get_notify_user(db: DBManager) -> dict:
         dict: A dictionary containing user IDs and their corresponding assignment data.
     """
     data = dict()
-    rows = db.fetch_notify_user()
-    for row in rows:
-        user_id,Line_uid,d3,d1, assignment_id = row
+    rows_3day = db.fetch_3d_notify_user()
+    for row in rows_3day:
+        user_id,Line_uid, assignment_id = row
         if user_id not in data:
             data[user_id] = {"l":Line_uid,"d1": [], "d3": []}
-        if not d3:
-            data[user_id]["d3"].append(assignment_id)
-        elif not d1:
-            data[user_id]["d1"].append(assignment_id)
+        data[user_id]["d3"].append(assignment_id)
+    rows_1day = db.fetch_1d_notify_user()
+    for row in rows_1day:
+        user_id, Line_uid, assignment_id = row
+        if user_id not in data:
+            data[user_id] = {"l": Line_uid, "d1": [], "d3": []}
+        data[user_id]["d1"].append(assignment_id)
 
     return data
 

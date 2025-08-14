@@ -12,7 +12,6 @@ from linebot.v3.messaging import (
     MessagingApi,
     ReplyMessageRequest,
     TextMessage,
-    FlexMessage
 )
 from linebot.v3.webhooks import (
     MessageEvent,

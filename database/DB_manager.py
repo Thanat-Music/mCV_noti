@@ -127,21 +127,36 @@ class DBManager:
         self.cur.execute(query,(user_id,))
         return self.cur.fetchall()
     
-    def fetch_notify_user(self):
+    def fetch_3d_notify_user(self):
         query = """
             SELECT 
                 ua.user_id,
                 u.Line_uid,
-                ua.notify_3d,
-                ua.notify_1d,
+                a.assignment_id
+            FROM user_assignments ua
+            JOIN assignment a ON ua.assignment_id = a.assignment_id
+            JOIN user u ON ua.user_id = u.user_id
+            WHERE 
+                datetime(a.due_date) >= datetime('now','+1 days', '+7 hours')
+                AND datetime(a.due_date) <= datetime('now', '+3 days', '+7 hours')
+                AND (ua.notify_3d = FALSE);
+        """
+        self.cur.execute(query)
+        return self.cur.fetchall()
+    
+    def fetch_1d_notify_user(self):
+        query = """
+            SELECT 
+                ua.user_id,
+                u.Line_uid,
                 a.assignment_id
             FROM user_assignments ua
             JOIN assignment a ON ua.assignment_id = a.assignment_id
             JOIN user u ON ua.user_id = u.user_id
             WHERE 
                 datetime(a.due_date) >= datetime('now', '+7 hours')
-                AND datetime(a.due_date) <= datetime('now', '+3 days', '+7 hours')
-                AND (ua.notify_3d = FALSE OR ua.notify_1d = FALSE);
+                AND datetime(a.due_date) <= datetime('now', '+1 days', '+7 hours')
+                AND (ua.notify_1d = FALSE);
         """
         self.cur.execute(query)
         return self.cur.fetchall()
