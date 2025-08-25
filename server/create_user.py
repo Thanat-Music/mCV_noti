@@ -15,6 +15,7 @@ def create_user(cname, cpass, line_uid):
         info("create_user", f"User {cname} created with ID {user_id}")
         db.commit()
         db.close()
+        return user_id
         
 if __name__ == "__main__":
         c = cipher()

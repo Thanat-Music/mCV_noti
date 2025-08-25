@@ -14,6 +14,7 @@ import time
 from dotenv import load_dotenv
 from database.DB_manager import DBManager
 from server.create_user import create_user
+from Utility.logger import info, warn, error
 
 load_dotenv()
 access_token = os.getenv("CHANNEL_ACCESS_TOKEN")
@@ -115,13 +116,14 @@ def handle_message(event):
             data = sessions[l_user_id]["data"]
 
             # Create user in DB
-            create_user(
+            uid = create_user(
                 cname=data["cname"],
                 cpass=data["cpass"],
                 line_uid=l_user_id
             )
 
             reply(reply_token, "🎉 Registration successful! You can now use the service.")
+            info("line_server", f"User {uid} registered with LINE ID {l_user_id}")
             del sessions[l_user_id]
             return
 
