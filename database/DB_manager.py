@@ -54,6 +54,10 @@ class DBManager:
         self.cur.execute("""
             DELETE FROM user WHERE user_id = ?;
         """, (user_id,))
+        
+    def is_line(self, line_uid):
+        self.cur.execute("SELECT 1 FROM user WHERE Line_uid = ?;", (line_uid,))
+        return self.cur.fetchone() is not None
 
     def assign_to_users(self,user_id, assignment_id,status):
         self.cur.execute("""
