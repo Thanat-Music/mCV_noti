@@ -1,9 +1,11 @@
 import sqlite3
+import datetime
 
 
 class DBManager:
     def __init__(self, db_name="database/main.db"):
         self.conn = sqlite3.connect(db_name)
+        self.conn.row_factory = sqlite3.Row # Enable dictionary-like row access
         self.cur = self.conn.cursor()
 
     def upsert_course(self, course):
@@ -15,7 +17,7 @@ class DBManager:
             course["title"],
             course["courseNumber"],
             course["thumbnail"],
-            course["semester"]
+            str(course["semester"]+"/"+str(course["courseYear"]))
         ))
 
     def upsert_assignment(self, assignment):
@@ -173,6 +175,50 @@ class DBManager:
         """, (notify_3d, notify_1d, user_id, assignment_id))
         return self.cur.rowcount > 0
 
+    # --- New methods for Firestore Synchronization (PUSH) ---
+
+    def fetch_all_users_for_sync(self):
+        """Retrieves all user records from SQLite."""
+        self.cur.execute("SELECT user_id, cname, cpass, Line_uid FROM user;")
+        # Return as a list of dicts for easy use with Firestore
+        return [dict(row) for row in self.cur.fetchall()]
+
+    def fetch_all_courses_for_sync(self):
+        """Retrieves all course records from SQLite."""
+        self.cur.execute("SELECT course_id, name, courseNumber, thumbnail, semester FROM course;")
+        return [dict(row) for row in self.cur.fetchall()]
+
+    def fetch_user_assignments_for_sync(self, user_id):
+        """
+        Retrieves all assignments for a specific user, joining with the main 
+        assignment table to get necessary details.
+        """
+        query = """
+        SELECT
+            a.assignment_id,
+            a.due_date,
+            a.name,
+            a.course_id,
+            ua.status
+        FROM user_assignments ua
+        JOIN assignment a ON ua.assignment_id = a.assignment_id
+        WHERE ua.user_id = ?;
+        """
+        self.cur.execute(query, (user_id,))
+        # Convert SQLite datetime strings to Firestore-friendly format (or ISO string)
+        assignments = []
+        for row in self.cur.fetchall():
+            assignment = dict(row)
+            # Firestore expects a timestamp object. Here, we'll format it as an ISO string.
+            # You will need to convert this string back to a proper Timestamp object 
+            # in the Firestore push script, which we will do there.
+            if assignment.get("due_date"):
+                # Assuming due_date is stored as a SQLite datetime string
+                assignment["due_date"] = datetime.datetime.fromisoformat(assignment["due_date"])
+            assignments.append(assignment)
+        
+        return assignments
+
     
     def commit(self):
         self.conn.commit()
@@ -181,13 +227,19 @@ class DBManager:
         self.conn.close()
         
 if __name__ == "__main__":
-    db = DBManager()
+    db = DBManager("main.db")
     # command = input()
     # db.delete_user("u1")
     # while command != "quit":
     #     exec(command)
     #     command = input()
+    db.cur.execute("""
+            INSERT INTO user (user_id, Line_uid)
+            VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                Line_uid=excluded.Line_uid
+        """, ("u1","Ubbde736d9177f91af92f73e2bbc4ee12"))
     db.commit()
     db.close()
     
-# db.delete_user("u1")
+    

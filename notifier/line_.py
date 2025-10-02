@@ -1,5 +1,3 @@
-from Utility.utility import replace_placeholders
-import json
 from linebot.v3.messaging import (
     Configuration,
     ApiClient,

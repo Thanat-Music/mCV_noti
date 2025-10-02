@@ -49,8 +49,7 @@ if __name__ == "__main__":
         cursor.execute("SELECT user_id, cname, cpass FROM user")
         users = cursor.fetchall()
 
-        for user_id, encname, encpass in users:
-            cname = c.decrypt(encname)
+        for user_id, cname, encpass in users:
             cpass = c.decrypt(encpass)
             try:
                 assignments_data = get_assingment(cname,cpass)
