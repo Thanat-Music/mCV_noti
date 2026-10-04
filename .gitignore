@@ -179,3 +179,12 @@ cython_debug/
 secret/
 temp/
 *.db
+*.db-wal
+*.db-shm
+state/
+receiver-proof-*.json
+
+.venv-noti/
+
+# Local agent workspace
+.openclaude/

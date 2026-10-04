@@ -1,0 +1,35 @@
+[Unit]
+Description=Personal mCV assignment notifications
+Wants=network-online.target
+After=network-online.target
+Conflicts=mcv-receiver.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=mcv-noti
+Group=mcv-noti
+WorkingDirectory=/opt/mcv-noti/current
+LoadCredential=private-key:/etc/mcv-noti/credentials/private_key.pem
+LoadCredential=line-env:/etc/mcv-noti/credentials/line.env
+ExecStart=/opt/mcv-noti/current/.venv/bin/python -m mcv_service --database /var/lib/mcv-noti/main.db --legacy-database /var/lib/mcv-noti/main.db --legacy-key ${CREDENTIALS_DIRECTORY}/private-key --line-env ${CREDENTIALS_DIRECTORY}/line-env --send --webhook
+Environment=PYTHONUNBUFFERED=1
+StateDirectory=mcv-noti
+StateDirectoryMode=0700
+RuntimeDirectory=mcv-noti
+RuntimeDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=60
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+LogNamespace=mcv-noti
+
+[Install]
+WantedBy=multi-user.target

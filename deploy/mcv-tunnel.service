@@ -1,0 +1,32 @@
+[Unit]
+Description=Quick Tunnel with automatic LINE webhook registration
+Wants=mcv-noti.service network-online.target
+After=mcv-noti.service network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=mcv-noti
+Group=mcv-noti
+WorkingDirectory=/opt/mcv-noti/current
+LoadCredential=line-env:/etc/mcv-noti/credentials/line.env
+ExecStart=/opt/mcv-noti/current/.venv/bin/python -m mcv_service.tunnel --line-env ${CREDENTIALS_DIRECTORY}/line-env --status /var/lib/mcv-noti/ingress.json
+Environment=HOME=/var/lib/mcv-noti/tunnel-home
+StateDirectory=mcv-noti
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=60
+KillMode=control-group
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+LogNamespace=mcv-noti
+
+[Install]
+WantedBy=multi-user.target
