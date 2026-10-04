@@ -1,4 +1,4 @@
-from receiver.session import LoginSession, AlphaDiscovery
+from receiver.session import LoginSession, discover_client_id
 
 
 class Response:
@@ -25,13 +25,13 @@ def test_login_form_and_post_without_diagnostics(capsys):
 
 
 def test_alpha_client_discovery_uses_current_bundle():
-    discovery = AlphaDiscovery()
+    from types import SimpleNamespace
     calls = []
     def get(url):
         calls.append(url)
         if len(calls) == 1:
             return Response('<script src="/assets/index-current.js"></script>')
         return Response('"https://www.mycourseville.com/api/oauth/authorize?client_id=abcdefghijklmnopqrstuv"')
-    discovery.session.get = get
-    assert discovery.get_client_id() == 'abcdefghijklmnopqrstuv'
+    session = SimpleNamespace(get=get)
+    assert discover_client_id(session) == 'abcdefghijklmnopqrstuv'
     assert calls[1] == 'https://alpha.mycourseville.com/assets/index-current.js'

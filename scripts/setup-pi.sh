@@ -9,8 +9,6 @@ mode="${1:---check}"
 }
 source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 bash "$source_dir/scripts/check-pi.sh"
-systemd_version="$(systemd --version | awk 'NR==1 {print $2}')"
-[[ "$systemd_version" -ge 247 ]] || { echo 'systemd 247+ required for service credentials' >&2; exit 1; }
 [[ "$mode" != --check ]] || { echo 'Install will use Cloudflare official apt repository and a Python venv.'; exit 0; }
 [[ "$EUID" -eq 0 ]] || { echo 'Run installation/activation with sudo' >&2; exit 1; }
 exec 9>/run/mcv-noti-install.lock

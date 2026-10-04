@@ -47,22 +47,20 @@ class LoginSession:
         response = self.session.post('https://www.mycourseville.com/api/chulalogin', data=login_data, allow_redirects=True)
         return response
 
-class AlphaDiscovery(LoginSession):
-
-    def get_client_id(self):
-        page = self.session.get('https://alpha.mycourseville.com/')
-        page.raise_for_status()
-        soup = BeautifulSoup(page.text, 'html.parser')
-        script_tag = soup.find('script', src=lambda s: s and '/assets/index-' in s)
-        if not script_tag:
-            raise RuntimeError('alpha_bundle_missing')
-        js_src = script_tag['src']
-        js_url = js_src if js_src.startswith('http') else 'https://alpha.mycourseville.com' + js_src
-        response = self.session.get(js_url)
-        response.raise_for_status()
-        js_code = response.text
-        match = re.search('https?:\\/\\/[^\\s"\\\']+client_id=([a-zA-Z0-9_-]{20,})', js_code)
-        if match:
-            return match.group(1)
-        else:
-            raise RuntimeError('alpha_client_id_missing')
+def discover_client_id(session):
+    page = session.get('https://alpha.mycourseville.com/')
+    page.raise_for_status()
+    soup = BeautifulSoup(page.text, 'html.parser')
+    script_tag = soup.find('script', src=lambda s: s and '/assets/index-' in s)
+    if not script_tag:
+        raise RuntimeError('alpha_bundle_missing')
+    js_src = script_tag['src']
+    js_url = js_src if js_src.startswith('http') else 'https://alpha.mycourseville.com' + js_src
+    response = session.get(js_url)
+    response.raise_for_status()
+    js_code = response.text
+    match = re.search('https?:\\/\\/[^\\s"\\\']+client_id=([a-zA-Z0-9_-]{20,})', js_code)
+    if match:
+        return match.group(1)
+    else:
+        raise RuntimeError('alpha_client_id_missing')

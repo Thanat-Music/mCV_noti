@@ -64,13 +64,11 @@ class CourseVille:
         """Discover the current OAuth client and validate the complete assignment response."""
         from datetime import datetime, timezone, timedelta
         from urllib.parse import urlencode, parse_qs
-        from .session import AlphaDiscovery
+        from .session import discover_client_id
         local = now or datetime.now(timezone(timedelta(hours=7)))
         semester = 1 if local.month >= 8 else (2 if local.month <= 5 else 3)
         year = local.year if semester == 1 else local.year - 1
-        discover = AlphaDiscovery.__new__(AlphaDiscovery)
-        discover.session = self.session
-        client_id = discover.get_client_id()
+        client_id = discover_client_id(self.session)
         response = self.session.get(BASE + "api/oauth/authorize?" + urlencode({
             "response_type": "code", "client_id": client_id,
             "redirect_uri": "https://alpha.mycourseville.com/", "state": "/course"}),

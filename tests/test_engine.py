@@ -1,9 +1,8 @@
-from datetime import datetime, timedelta
-import json
+from datetime import datetime
 import pytest
 
 from receiver.store import Store
-from mcv_service.engine import Engine, BANGKOK, DAY
+from mcv_service.engine import Engine, BANGKOK
 from mcv_service.line import Line, DeliveryError
 
 

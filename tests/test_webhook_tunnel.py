@@ -12,7 +12,10 @@ from mcv_service.tunnel import candidate, reconcile
 from receiver.store import Store
 
 
-def test_webhook_signature_empty_events_and_duplicate(tmp_path):
+def test_webhook_signature_empty_events_and_duplicate(tmp_path, monkeypatch):
+    logs = []
+    monkeypatch.setattr("mcv_service.webhook.log_event",
+                        lambda name, **fields: logs.append((name, fields)))
     async def scenario():
         store = Store(tmp_path / "state.db")
         engine = Engine(store)
@@ -38,6 +41,10 @@ def test_webhook_signature_empty_events_and_duplicate(tmp_path):
             await client.close()
             store.close()
     asyncio.run(scenario())
+    assert ("webhook.recipient_mismatch", {}) in logs
+    assert sum(name == "webhook.received" for name, _ in logs) == 4
+    assert "personal-user" not in repr(logs)
+    assert "stranger" not in repr(logs)
 
 
 @pytest.mark.parametrize("line", ["https://foo.trycloudflare.com.evil.org", "http://foo.trycloudflare.com", "https://foo.trycloudflare.com:443"])

@@ -7,6 +7,7 @@ import time
 from datetime import datetime
 from aiohttp import web
 from .engine import BANGKOK
+from receiver.logging import event as log_event
 
 
 def application(engine, secret, recipient):
@@ -29,10 +30,12 @@ def application(engine, secret, recipient):
                 raise ValueError()
         except (ValueError, KeyError, TypeError):
             raise web.HTTPBadRequest() from None
+        log_event("webhook.received", count=len(events))
         now = time.time()
         with engine.db:
             for event in events:
                 if event.get("source", {}).get("userId") != recipient:
+                    log_event("webhook.recipient_mismatch")
                     continue
                 event_id = event.get("webhookEventId")
                 if not isinstance(event_id, str):

@@ -2,7 +2,6 @@
 import argparse
 import asyncio
 from datetime import datetime
-import json
 import logging
 import os
 from pathlib import Path
@@ -45,7 +44,6 @@ async def daemon(args):
             if args.send and (not token or not recipient):
                 raise RuntimeError("line_credentials_missing")
             sender = Line(token, recipient)
-            stop = asyncio.Event()
             loop = asyncio.get_running_loop()
             for sig in (signal.SIGTERM, signal.SIGINT):
                 signal.signal(sig, lambda *_: loop.call_soon_threadsafe(stop.set))
@@ -121,7 +119,8 @@ async def daemon(args):
                             event("delivery.accepted")
                         except Exception as exc:
                             engine.failed(out_id, time.time(), isinstance(exc, DeliveryError) and exc.permanent)
-                            event("delivery.failed", logging.ERROR, error_type=type(exc).__name__)
+                            event("delivery.failed", logging.ERROR, error_type=type(exc).__name__,
+                                  status=getattr(exc, "status", None))
                 if args.once:
                     if store.get("refresh_failed", False):
                         raise RuntimeError("one_shot_refresh_failed")
