@@ -69,6 +69,7 @@ async def daemon(args):
                 now = time.time()
                 local = datetime.fromtimestamp(now, BANGKOK)
                 day = local.date().isoformat()
+                engine.forward_pushes(now)
                 requested, completed = store.db.execute("SELECT requested,completed FROM push_refresh").fetchone()
                 daily_due = local.hour >= 6 and store.get("daily_attempt") != day
                 identity = store.get("identity", {})
@@ -114,7 +115,7 @@ async def daemon(args):
                             continue
                         out_id, text, retry_key = prepared
                         try:
-                            await asyncio.to_thread(sender.send, text, retry_key)
+                            await asyncio.to_thread(sender.send, engine.delivery_messages(out_id, text, time.time()), retry_key)
                             engine.accepted(out_id)
                             event("delivery.accepted")
                         except Exception as exc:
@@ -153,7 +154,7 @@ def main():
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--no-receiver", action="store_true")
     parser.add_argument("--seconds", type=int, default=0)
-    parser.add_argument("--webhook", action="store_true", help="Expose only /callback and /healthz on loopback")
+    parser.add_argument("--webhook", action="store_true", help="Expose signed callback, private notification settings and health on loopback")
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
     configure()

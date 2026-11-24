@@ -35,7 +35,7 @@ if [[ "$mode" == --install ]]; then
     if [[ ! -f "$release/.ready" ]]; then
         for module in receiver mcv_service; do
             install -d -m 0755 "$release/$module"
-            find "$source_dir/$module" -maxdepth 1 -name '*.py' -type f -exec install -m 0644 -t "$release/$module" {} +
+            find "$source_dir/$module" -maxdepth 1 -type f \( -name '*.py' -o -name '*.json' \) -exec install -m 0644 -t "$release/$module" {} +
         done
         install -m 0644 "$source_dir/requirements.txt" "$release/requirements.txt"
         python3 -m venv "$release/.venv"

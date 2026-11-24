@@ -5,6 +5,15 @@ from datetime import datetime, timedelta, timezone
 
 BANGKOK = timezone(timedelta(hours=7))
 DAY = 86400
+NOTIFICATION_TYPES = {
+    "initial_summary": "Initial assignment summary",
+    "new_assignment": "New assignments",
+    "deadline_changed": "Changed deadlines",
+    "deadline_summary": "Daily deadline reminders (3 days / 1 day)",
+    "courseville_push": "All CourseVille push notifications",
+    "incident": "Refresh failures",
+    "recovery": "Refresh recovery",
+}
 
 
 def due_timestamp(value):
@@ -46,6 +55,44 @@ class Engine:
                 state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
                 next_try REAL NOT NULL DEFAULT 0, created REAL NOT NULL, expires REAL);
         ''')
+
+    def preferences(self):
+        saved = self.store.get("notification_preferences", {})
+        return {key: saved.get(key, True) for key in NOTIFICATION_TYPES}
+
+    def save_preferences(self, values):
+        if set(values) != set(NOTIFICATION_TYPES) or any(type(v) is not bool for v in values.values()):
+            raise ValueError("invalid_notification_preferences")
+        self.store.put("notification_preferences", values)
+
+    def homework(self, now):
+        local = datetime.fromtimestamp(now, BANGKOK)
+        start = local.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        end = start + 8 * DAY
+        items = []
+        for data, generation in self.db.execute("SELECT data,generation FROM app_items WHERE active=1"):
+            item = json.loads(data)
+            if item["due"] is not None and start <= item["due"] < end:
+                items.append(dict(item, generation=generation))
+        return items
+
+    def queue_homework(self, event_id, now):
+        # Build after the requested reconciliation, rather than replying from stale cache.
+        self._queue("line:" + event_id, "homework", [], now, expires=now+3600)
+        self.db.execute("UPDATE push_refresh SET requested=requested+1 WHERE singleton=1")
+
+    def forward_pushes(self, now):
+        with self.db:
+            for channel, version, raw in self.db.execute(
+                    "SELECT channel,version,payload FROM push_inbox WHERE state='pending'").fetchall():
+                payload = json.loads(raw)
+                notification = payload.get("notification")
+                content = notification if isinstance(notification, dict) else payload
+                parts = [content.get("title"), content.get("body"), content.get("message")]
+                text = "CourseVille notification\n" + "\n".join(v[:4000] for v in parts if isinstance(v, str) and v)
+                if text == "CourseVille notification\n":
+                    text += "A course update was received. Open CourseVille for details."
+                self._queue("push:" + channel + ":" + version, "courseville_push", [], now, text=text)
 
     def _meta(self, name, value):
         # Caller owns transaction; do not use Store.put (which commits separately).
@@ -128,6 +175,26 @@ class Engine:
             with self.db:
                 self.db.execute("UPDATE app_outbox SET state='expired' WHERE id=?", (out_id,))
             return None
+        if kind in NOTIFICATION_TYPES and not self.preferences()[kind]:
+            with self.db:
+                self.db.execute("UPDATE app_outbox SET state='cancelled' WHERE id=?", (out_id,))
+            return None
+        if kind == "homework" and text is None:
+            requested, completed = self.db.execute("SELECT requested,completed FROM push_refresh").fetchone()
+            if requested > completed and not self.store.get("refresh_failed", False):
+                return None
+            from .flex import assignment_messages
+            items = sorted(self.homework(now), key=lambda item: (item["due"], item["id"]))
+            label = "Homework: today through 7 days ahead (Bangkok)"
+            if requested > completed:
+                last = self.store.get("last_refresh")
+                label += " — cached update: " + (datetime.fromtimestamp(last, BANGKOK).strftime("%d %b %H:%M") if last else "not yet available")
+            text = json.dumps(assignment_messages(items, label, now))
+            with self.db:
+                self.db.execute("UPDATE app_outbox SET text=? WHERE id=?", (text, out_id))
+            return out_id, text, retry_key
+        if kind == "homework":
+            return out_id, text, retry_key
         original = json.loads(refs_raw)
         refs, items = [], {}
         for ref in original:
@@ -162,6 +229,25 @@ class Engine:
                                 (json.dumps(refs), text, retry_key, out_id))
         return out_id, text, retry_key
 
+    def delivery_messages(self, out_id, text, now):
+        row = self.db.execute("SELECT kind,refs FROM app_outbox WHERE id=?", (out_id,)).fetchone()
+        if row[0] == "homework":
+            return json.loads(text)
+        from .flex import assignment_messages
+        refs = json.loads(row[1])
+        if not refs:
+            return [{"type": "text", "text": text[i:i+2000]} for i in range(0, len(text), 2000)]
+        cache_key = "flex:" + out_id
+        cached = self.store.get(cache_key)
+        if cached and cached["text"] == text:
+            return cached["messages"]
+        items = [json.loads(self.db.execute("SELECT data FROM app_items WHERE id=?", (ref["id"],)).fetchone()[0]) for ref in refs]
+        messages = assignment_messages(items, text.split("\n")[0], now)
+        if "last successful update" in text:
+            messages.insert(0, {"type": "text", "text": text.split("\n")[-1]})
+        self.store.put(cache_key, {"text": text, "messages": messages})
+        return messages
+
     def pending(self, now):
         return self.db.execute("SELECT id,kind,refs,text,retry_key,attempts,expires FROM app_outbox WHERE state='pending' AND next_try<=? ORDER BY created LIMIT 20", (now,)).fetchall()
 
@@ -195,5 +281,6 @@ class Engine:
         with self.db:
             # Pending work and reminder identities survive diagnostic retention.
             self.db.execute("DELETE FROM push_inbox WHERE state='processed' AND received<?", (now-7*DAY,))
+            self.db.execute("DELETE FROM push_state WHERE name LIKE 'flex:%' AND substr(name,6) IN (SELECT id FROM app_outbox WHERE state IN ('sent','cancelled','expired') AND created<?)", (now-30*DAY,))
             self.db.execute("DELETE FROM app_outbox WHERE state IN ('sent','cancelled','expired') AND created<?", (now-30*DAY,))
             self._meta("retention_at", now)

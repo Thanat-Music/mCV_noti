@@ -1,0 +1,40 @@
+{
+  "type": "bubble",
+  "header": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "<COURSE_TITLE>",
+        "weight": "bold",
+        "size": "xl",
+        "wrap": true,
+        "margin": "md",
+        "position": "relative",
+        "align": "start",
+        "gravity": "center",
+        "color": "#FFFFFF"
+      }
+    ],
+    "position": "relative",
+    "paddingAll": "xl"
+  },
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": ["BODY_CONTENTS"]
+  },
+  "styles": {
+    "header": {
+      "separator": true,
+      "backgroundColor": "#4d0000"
+    },
+    "body": {
+      "separator": true
+    },
+    "footer": {
+      "separator": true
+    }
+  }
+}
