@@ -30,11 +30,11 @@ def credentials(args):
     return username, password, values.get("CHANNEL_ACCESS_TOKEN"), recipient, values.get("CHANNEL_SECRET")
 
 
-async def daemon(args):
+async def daemon(args, managed_stop=None, on_ready=None):
     os.umask(0o077)
     with ReceiverLock(args.database):
         store = Store(args.database)
-        stop = asyncio.Event()
+        stop = managed_stop or asyncio.Event()
         receiver_task = None
         web_runner = None
         try:
@@ -44,9 +44,12 @@ async def daemon(args):
             if args.send and (not token or not recipient):
                 raise RuntimeError("line_credentials_missing")
             sender = Line(token, recipient)
+            if on_ready:
+                on_ready(engine, recipient)
             loop = asyncio.get_running_loop()
-            for sig in (signal.SIGTERM, signal.SIGINT):
-                signal.signal(sig, lambda *_: loop.call_soon_threadsafe(stop.set))
+            if managed_stop is None:
+                for sig in (signal.SIGTERM, signal.SIGINT):
+                    signal.signal(sig, lambda *_: loop.call_soon_threadsafe(stop.set))
             if args.seconds:
                 loop.call_later(args.seconds, stop.set)
             receiver_task = asyncio.create_task(receiver.listen(stop)) if not args.no_receiver else None
@@ -156,10 +159,16 @@ def main():
     parser.add_argument("--seconds", type=int, default=0)
     parser.add_argument("--webhook", action="store_true", help="Expose signed callback, private notification settings and health on loopback")
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--multi-user", action="store_true", help="Run isolated account workers and SSH-only admin dashboard")
+    parser.add_argument("--admin-port", type=int, default=8081)
     args = parser.parse_args()
     configure()
     try:
-        asyncio.run(daemon(args))
+        if args.multi_user:
+            from .supervisor import serve
+            asyncio.run(serve(args))
+        else:
+            asyncio.run(daemon(args))
     except KeyboardInterrupt:
         pass
     except Exception as exc:

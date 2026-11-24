@@ -4,7 +4,11 @@ Personal CourseVille assignment notifications for a Raspberry Pi, delivered thro
 
 ## Start here
 
-- [Setup and operations](docs/receiver.md)
+- [Complete reference manual](docs/reference.md): architecture, commands, APIs, database and troubleshooting
+- [Quick setup runbook](docs/receiver.md)
+- [LINE commands and notification settings](docs/notifications.md)
+- [SSH dashboard, user administration and signup](docs/admin.md)
+- [LLM handoff index and development diary](docs/llm/README.md)
 - `mcv_service/__main__.py`: application entry point and scheduling
 - `mcv_service/engine.py`: assignment changes and reminder rules
 - `receiver/courseville.py`: CourseVille subscription and assignment API
@@ -37,4 +41,4 @@ python -m mcv_service --once --no-receiver
 
 The application defaults to dry-run; `--send` enables actual LINE delivery. Dry-run still writes runtime state and queues messages, so use a separate database for experiments. The Pi installer is `scripts/setup-pi.sh`; see the runbook before activation.
 
-CourseVille registration and controlled push transport have been tested. Genuine CourseVille push delivery and continuous operation on the Pi still need verification. The admin dashboard remains deferred.
+CourseVille registration and controlled push transport have been tested. Genuine CourseVille push delivery and continuous operation on the Pi still need verification. Notification preferences are available through the private `settings` LINE command. The multi-user runtime also includes an SSH-only admin dashboard; see the admin guide.

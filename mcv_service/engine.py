@@ -2,6 +2,7 @@
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
+from .push_types import PUSH_TYPES, classify_push
 
 BANGKOK = timezone(timedelta(hours=7))
 DAY = 86400
@@ -10,7 +11,7 @@ NOTIFICATION_TYPES = {
     "new_assignment": "New assignments",
     "deadline_changed": "Changed deadlines",
     "deadline_summary": "Daily deadline reminders (3 days / 1 day)",
-    "courseville_push": "All CourseVille push notifications",
+    **PUSH_TYPES,
     "incident": "Refresh failures",
     "recovery": "Refresh recovery",
 }
@@ -58,7 +59,8 @@ class Engine:
 
     def preferences(self):
         saved = self.store.get("notification_preferences", {})
-        return {key: saved.get(key, True) for key in NOTIFICATION_TYPES}
+        return {key: saved.get(key, saved.get("courseville_push", True) if key in PUSH_TYPES else True)
+                for key in NOTIFICATION_TYPES}
 
     def save_preferences(self, values):
         if set(values) != set(NOTIFICATION_TYPES) or any(type(v) is not bool for v in values.values()):
@@ -77,9 +79,8 @@ class Engine:
         return items
 
     def queue_homework(self, event_id, now):
-        # Build after the requested reconciliation, rather than replying from stale cache.
+        # Read the latest stored snapshot; this command never requests a network refresh.
         self._queue("line:" + event_id, "homework", [], now, expires=now+3600)
-        self.db.execute("UPDATE push_refresh SET requested=requested+1 WHERE singleton=1")
 
     def forward_pushes(self, now):
         with self.db:
@@ -92,7 +93,8 @@ class Engine:
                 text = "CourseVille notification\n" + "\n".join(v[:4000] for v in parts if isinstance(v, str) and v)
                 if text == "CourseVille notification\n":
                     text += "A course update was received. Open CourseVille for details."
-                self._queue("push:" + channel + ":" + version, "courseville_push", [], now, text=text)
+                kind = classify_push(payload)
+                self._queue("push:" + channel + ":" + version, kind, [], now, text=text)
 
     def _meta(self, name, value):
         # Caller owns transaction; do not use Store.put (which commits separately).
@@ -175,21 +177,24 @@ class Engine:
             with self.db:
                 self.db.execute("UPDATE app_outbox SET state='expired' WHERE id=?", (out_id,))
             return None
-        if kind in NOTIFICATION_TYPES and not self.preferences()[kind]:
+        # Existing unclassified outbox rows use the Other preference after upgrading.
+        preference_kind = "push_other" if kind == "courseville_push" else kind
+        if preference_kind in NOTIFICATION_TYPES and not self.preferences()[preference_kind]:
             with self.db:
                 self.db.execute("UPDATE app_outbox SET state='cancelled' WHERE id=?", (out_id,))
             return None
         if kind == "homework" and text is None:
-            requested, completed = self.db.execute("SELECT requested,completed FROM push_refresh").fetchone()
-            if requested > completed and not self.store.get("refresh_failed", False):
-                return None
             from .flex import assignment_messages
             items = sorted(self.homework(now), key=lambda item: (item["due"], item["id"]))
             label = "Homework: today through 7 days ahead (Bangkok)"
-            if requested > completed:
-                last = self.store.get("last_refresh")
-                label += " — cached update: " + (datetime.fromtimestamp(last, BANGKOK).strftime("%d %b %H:%M") if last else "not yet available")
-            text = json.dumps(assignment_messages(items, label, now))
+            last = self.store.get("last_refresh")
+            if last is None:
+                messages = [{"type": "text", "text": "No assignment data saved yet. Homework will be available after the next successful scheduled or push update."}]
+            else:
+                updated = datetime.fromtimestamp(last, BANGKOK).strftime("%d %b %Y %H:%M Bangkok")
+                messages = [{"type": "text", "text": "Homework from saved data. Last update: " + updated}]
+                messages.extend(assignment_messages(items, label, now))
+            text = json.dumps(messages)
             with self.db:
                 self.db.execute("UPDATE app_outbox SET text=? WHERE id=?", (text, out_id))
             return out_id, text, retry_key

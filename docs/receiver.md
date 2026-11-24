@@ -1,6 +1,8 @@
 # Personal Pi notification service
 
-The new entry point is `python -m mcv_service`. One account (`u1`), one recipient, no Firebase, no backups. Admin dashboard is deferred until live operation is verified.
+For the full command, API and database reference, see [the reference manual](reference.md).
+
+The entry point is `python -m mcv_service`. The default CLI mode runs one selected account; the Pi installer enables `--multi-user`, isolated account workers and an SSH-only admin dashboard. See [dashboard and registration](admin.md). No Firebase or automatic backups.
 
 ## Flow and schedule
 
@@ -8,7 +10,7 @@ CourseVille publishes encrypted Web Push to a Mozilla Autopush subscription. Our
 
 Startup, received push and the daily 06:00 Asia/Bangkok run fetch assignments. The daily run reconciles submission status and sends due reminders; three-day and one-day thresholds fire once each. Reminders stop at the deadline. New assignments and changed deadlines alert immediately after discovery. Missed edits are caught on the daily fetch. Initial import sends one summary. Cached-data summaries identify the last successful refresh when refresh fails. Downtime catches up only the current day's summary.
 
-LINE delivery uses persistent retry keys. Ambiguous failures retry; possible duplicates remain preferable to lost notifications. Permanent API errors remain visible as failed outbox rows. A separate Cloudflare Quick Tunnel process exposes only the signed LINE callback and health endpoint. Each new tunnel URL is tested, updated through LINE API, read back and verified. Tunnel readiness does not affect outbound CourseVille Web Push.
+LINE delivery uses persistent retry keys. Ambiguous failures retry; possible duplicates remain preferable to lost notifications. Permanent API errors remain visible as failed outbox rows. A separate Cloudflare Quick Tunnel process exposes the signed LINE callback, health endpoint and private notification settings page. Send `homework` or `settings` in LINE; see [notification commands and preferences](notifications.md). Each new tunnel URL is tested, updated through LINE API, read back and verified. Tunnel readiness does not affect outbound CourseVille Web Push.
 
 ## Local checks
 
@@ -69,4 +71,4 @@ The real u1 subscription was published and confirmed through CourseVille list/ch
 
 For the next genuine course update, record the receiver inbox count before and after, confirm a refresh follows, and compare the resulting assignment data with CourseVille. Material or announcement pushes may trigger a refresh without an assignment alert. Do not edit a real course merely to manufacture a test. Then verify a real LINE notification on the intended personal account. Restart the app and confirm the same subscription is reused; restart the tunnel and confirm LINE's configured URL matches the new callback and a signed webhook succeeds. Run a 72-hour Pi soak including a network outage and restart: pending work must recover, accepted reminder thresholds must not repeat, and expired assignments must produce no reminders.
 
-Automated tests and the controlled live transport proof have passed on Windows. Native ARM installation, systemd service activation, live LINE/tunnel changes, real CourseVille push delivery and the Pi soak are deployment gates, not completed tests. Autopush's external client protocol is experimental; daily reconciliation is the fallback, and immediate delivery is not guaranteed.
+Automated tests and the controlled live transport proof have passed on Windows. The user subsequently confirmed Pi startup and a working LINE status reply. Genuine CourseVille push, scheduled reminder delivery and the Pi soak remain deployment gates. Autopush's external client protocol is experimental; daily reconciliation is the fallback, and immediate delivery is not guaranteed.

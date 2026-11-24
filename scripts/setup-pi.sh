@@ -35,7 +35,7 @@ if [[ "$mode" == --install ]]; then
     if [[ ! -f "$release/.ready" ]]; then
         for module in receiver mcv_service; do
             install -d -m 0755 "$release/$module"
-            find "$source_dir/$module" -maxdepth 1 -type f \( -name '*.py' -o -name '*.json' \) -exec install -m 0644 -t "$release/$module" {} +
+            find "$source_dir/$module" -maxdepth 1 -type f \( -name '*.py' -o -name '*.json' -o -name '*.html' \) -exec install -m 0644 -t "$release/$module" {} +
         done
         install -m 0644 "$source_dir/requirements.txt" "$release/requirements.txt"
         python3 -m venv "$release/.venv"
@@ -64,7 +64,12 @@ test -r /etc/mcv-noti/credentials/private_key.pem
 test -r /etc/mcv-noti/credentials/line.env
 test -f /var/lib/mcv-noti/main.db
 cd /opt/mcv-noti/current
-./.venv/bin/python -c "from receiver.courseville import legacy_account; legacy_account('/var/lib/mcv-noti/main.db','/etc/mcv-noti/credentials/private_key.pem','u1'); print('Account decryption verified')"
+./.venv/bin/python - <<'PY'
+from pathlib import Path
+from cryptography.hazmat.primitives import serialization
+serialization.load_pem_private_key(Path('/etc/mcv-noti/credentials/private_key.pem').read_bytes(), password=None)
+print('Private key verified. Individual accounts are checked by their isolated workers.')
+PY
 systemctl disable --now mcv-receiver.service 2>/dev/null || true
 systemctl enable --now mcv-noti.service mcv-tunnel.service
 echo 'Activated: CourseVille subscription, LINE notifications, and public callback tunnel.'
