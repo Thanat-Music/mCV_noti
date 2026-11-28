@@ -19,6 +19,7 @@ from mcv_service.accounts import Accounts
 from mcv_service.admin import application as admin_app
 from mcv_service.dashboard import read_snapshot
 from mcv_service.enrollment import Enrollment
+from mcv_service.policies import POLICY_VERSION
 from mcv_service.engine import Engine, NOTIFICATION_TYPES
 from mcv_service.supervisor import Workers
 from mcv_service.webhook import application
@@ -92,7 +93,20 @@ def test_signup_sender_binding_expiry_and_approval(tmp_path):
     assert enrollment.valid(token) == recipient
     assert enrollment.valid(token, time.time()+901) is None
     assert enrollment.valid('x'*64) is None
-    user = enrollment.register(token, 'Student', 'student', 'private-pass')
+    for options in ({}, {'terms_accepted': True},
+                    {'terms_accepted': True, 'privacy_acknowledged': True, 'policy_version': 'old'}):
+        try:
+            enrollment.register(token, 'Student', 'student', 'private-pass', **options)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('Registration accepted without current policy acknowledgements')
+        assert enrollment.valid(token) == recipient
+        assert accounts.list() == []
+    user = enrollment.register(token, 'Student', 'student', 'private-pass',
+        terms_accepted=True, privacy_acknowledged=True, policy_version=POLICY_VERSION)
+    assert accounts.db.execute('SELECT terms_version,privacy_version FROM admin_policy_acceptance WHERE user_id=?',
+                              (user['id'],)).fetchone() == (POLICY_VERSION, POLICY_VERSION)
     assert user['line_id'] == recipient and not user['enabled'] and not user['approved']
     assert enrollment.valid(token) is None
     accounts.save({'enabled': True}, user['id'])

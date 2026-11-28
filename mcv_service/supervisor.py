@@ -70,6 +70,7 @@ class Workers:
     def public_app(self, secret):
         self.secret = secret
         from .enrollment import Enrollment
+        from .policies import policy_page
         self.enrollment = Enrollment(self.accounts, secret)
         app = web.Application(client_max_size=65536)
 
@@ -138,6 +139,8 @@ class Workers:
             return web.json_response({'ready': True})
         app.router.add_get('/register', self.enrollment.page)
         app.router.add_post('/register', self.enrollment.page)
+        app.router.add_get('/terms', policy_page)
+        app.router.add_get('/privacy', policy_page)
         app.router.add_get('/healthz', health)
         app.router.add_post('/callback', callback)
         app.router.add_get('/settings/{user_id}', settings)

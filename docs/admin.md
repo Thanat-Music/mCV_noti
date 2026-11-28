@@ -26,10 +26,27 @@ SSH authenticates the admin. There is no separate admin password. The admin list
 1. User adds the existing LINE bot as a friend and sends `start` in direct chat.
 2. The signed webhook obtains their LINE user ID automatically. A private signup link is queued to that same recipient, with persistent LINE retry keys.
 3. The link expires in 15 minutes, is tied to that LINE identity, and can be submitted once. A fresh `start` revokes older unused links; duplicate webhook delivery does not create duplicate messages. Up to three fresh links per minute per LINE identity are allowed.
-4. User enters display name and their own CourseVille username/password in the HTTPS signup page. The page never accepts a LINE UID from the browser. Credentials are encrypted using the existing RSA key scheme. The operator controls the private key; encryption at rest does not hide credentials from the operator.
+4. User enters **Name or nickname** (any name the admin can recognize; it need not match LINE or CourseVille) and their own CourseVille username/password in the HTTPS signup page. The name field is only an account label, not a login or LINE UID. The page never accepts a LINE UID from the browser. Credentials are encrypted using the existing RSA key scheme. The operator controls the private key; encryption at rest does not hide credentials from the operator.
 5. User appears as **awaiting approval**. Admin reviews and selects **Approve**. Only then does an isolated worker start and log in. Approval does not itself prove the CourseVille credentials are valid; view the first update result.
 
 A pending user's `start` reports that approval is pending. An approved but paused user's `start` asks them to contact dev. A registered active user's normal commands remain `homework`, `status`, and `settings`. Unknown users cannot access another account's commands or settings. Expired links require a new `start`. The Cloudflare URL may change on restart; request a fresh link if an old URL stops working.
+
+### Signup terms and privacy notice
+
+The multi-user web app serves `/terms` and `/privacy` without requiring a signup token. The notices identify the maintainer as ธนัท, contact `musiz.thanat@gmail.com`. They describe the personal project, notification risks, password decryption by the operator, actual data flows/retention and rights requests. They do not claim that personal-project status exempts the service from privacy law or that users waive all legal rights.
+
+New signup requires two separate unchecked boxes: accepting the Terms of Use and acknowledging the Privacy Notice. The server checks both and the current `POLICY_VERSION`; missing/old acknowledgments cannot create an account or consume the invite. Successful signup stores account ID, terms/privacy versions and timestamp in `admin_policy_acceptance`, without collecting IP for this purpose. Privacy acknowledgment is not blanket consent for unrelated processing. Existing users are not retroactively marked as having accepted; manual admin-created accounts also have no signup acknowledgment unless explicitly recorded by a separate workflow.
+
+Text is in `mcv_service/policies.py`. Bump the version and preserve the historical text when making material changes; existing acknowledgment records do not automatically cover new terms. Rights requests and complete deletion remain manual: admin account deletion preserves per-user history on disk and does not erase all data automatically. Review retention and provider arrangements before expanding the service; the notices are not a certification of legal compliance.
+
+To review offline without credentials or live signup:
+
+```powershell
+python scripts/preview_signup.py
+python -m unittest discover -s tests -p test_policies.py -v
+```
+
+Open `docs/previews/signup.html`, `terms.html` and `privacy.html`. Preview buttons/credential fields are disabled. The preview files are generated from the same rendering code as the live pages. This unit check uses an in-memory fake account store; run the full admin/encryption/HTTP tests in a normally provisioned environment before deployment.
 
 ## Dashboard controls
 

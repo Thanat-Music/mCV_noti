@@ -188,3 +188,7 @@ receiver-proof-*.json
 
 # Local agent workspace
 .openclaude/
+
+# Local development notes and generated previews
+/docs/llm/
+/docs/previews/
