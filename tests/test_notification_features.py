@@ -39,6 +39,9 @@ def test_week_boundaries_submissions_and_flex(tmp_path):
     store.db.execute("UPDATE push_refresh SET requested=1")
     first = engine.prepare(row, now)
     assert first is not None
+    payload = engine.delivery_messages(first[0], first[1], now)
+    assert len(payload) == 1 and payload[0]['type'] == 'flex'
+    assert 'Last update:' in json.dumps(payload)
     second = engine.prepare(next(r for r in engine.pending(now) if r[1] == 'homework'), now+60)
     assert first == second
     store.close()
@@ -83,7 +86,10 @@ def test_settings_authorization_and_signed_commands(tmp_path):
             assert response.status == 200 and 'Settings saved' in await response.text()
             assert engine.preferences()['new_assignment'] is True
             assert engine.preferences()['deadline_summary'] is False
+            engine.delivery_ready.clear()
             assert (await command(' HOMEWORK ', 'h1')).status == 200
+            assert engine.delivery_ready.is_set()
+            assert not store.db.in_transaction
             assert (await command('homework', 'h1')).status == 200
             assert store.db.execute("SELECT COUNT(*) FROM app_outbox WHERE kind='homework'").fetchone()[0] == 1
             assert (await client.get('/settings?token=' + token[:-1] + 'x')).status == 403
@@ -222,12 +228,70 @@ def test_real_material_and_score_pushes(tmp_path):
     store.close()
 
 
-def test_suffix_priority_and_provisional_announcement():
+def test_suffix_priority_and_verified_announcement():
     from mcv_service.push_types import classify_push, PUSH_TYPES
-    assert 'unverified' in PUSH_TYPES['push_announcement']
+    assert 'unverified' not in PUSH_TYPES['push_announcement']
     assert classify_push({'title': 'Exam - tips - Announcement'}) == 'push_announcement'
     assert classify_push({'title': 'Homework - Material - Score'}) == 'push_score'
     assert classify_push({'title': 'Score discussion'}) == 'push_other'
     assert classify_push({'title': 'Lab - Unknown', 'url': 'https://www.mycourseville.com/?q=courseville/course/1/material/2'}) == 'push_material'
     assert classify_push({'title': 'Lab - Unknown'}) == 'push_other'
     assert classify_push({'title': 'Lab - Score', 'notification': {'title': 'Lab - Material'}}) == 'push_other'
+
+
+def test_typed_push_and_service_cards_are_frozen(tmp_path):
+    from mcv_service.flex import THEMES
+    store = Store(tmp_path / 'cards.db')
+    engine = Engine(store)
+    for version, kind in enumerate(('material', 'score', 'announcement', 'assignment')):
+        store.accept('cards', str(version), {'type': kind, 'title': 'A quoted "title"',
+                                           'message': 'Control Systems'})
+    engine.forward_pushes(10)
+    engine.incident(True, 11)
+    engine.incident(False, 12)
+    for row in engine.pending(12):
+        ready = engine.prepare(row, 12)
+        messages = engine.delivery_messages(ready[0], ready[1], 12)
+        assert all(m['type'] == 'flex' for m in messages)
+        bubble = messages[0]['contents']['contents'][0]
+        assert bubble['body']['borderWidth'] == '1px'
+        assert bubble['body']['contents'][0]['size'] == 'sm'
+        if row[1].startswith('push_'):
+            assert bubble['body']['contents'][1]['text'] == 'Control Systems'
+            assert bubble['body']['contents'][1]['size'] == 'xl'
+        assert 'CourseVille notification' not in json.dumps(messages)
+        assert engine.delivery_messages(ready[0], ready[1], 100) == messages
+    store.close()
+
+
+def test_push_uses_original_course_header_and_detail_row():
+    from mcv_service.flex import push_messages
+    url = 'https://www.mycourseville.com/?q=courseville/course/1/material/2'
+    messages = push_messages('push_material', {
+        'title': 'Lecture 9 - Material', 'message': 'Random Processes', 'url': url})
+    bubble = messages[0]['contents']['contents'][0]
+    assert bubble['body']['contents'][0]['text'] == 'MATERIAL'
+    assert bubble['body']['contents'][1]['text'] == 'Random Processes'
+    assert bubble['body']['contents'][2]['text'] == 'Lecture 9'
+    button = bubble['body']['contents'][-1]
+    assert button['style'] == 'primary' and button['action']['label'] == 'Open material'
+    assert button['action']['uri'] == url
+    unsafe = push_messages('push_score', {'title': 'Lab - Score', 'url': 'https://evil.example/'})
+    assert 'evil.example' not in json.dumps(unsafe)
+
+
+def test_stale_reminder_embeds_timestamp(tmp_path):
+    store = Store(tmp_path / 'stale.db')
+    engine = Engine(store)
+    now = datetime(2026, 11, 24, 6, tzinfo=BANGKOK).timestamp()
+    due = datetime.fromtimestamp(now + 4 * DAY, BANGKOK).isoformat()
+    engine.snapshot([dict(courseID='1', title='Control', assignments=[
+        dict(id='1', title='HW', status='ASSIGNED', dueDate=due)])], now)
+    engine.store.put('refresh_failed', True)
+    engine.morning(now + DAY)
+    row = next(r for r in engine.pending(now + DAY) if r[1] == 'deadline_summary')
+    ready = engine.prepare(row, now + DAY)
+    messages = engine.delivery_messages(ready[0], ready[1], now + DAY)
+    assert len(messages) == 1 and messages[0]['type'] == 'flex'
+    assert 'last successful update' in json.dumps(messages)
+    store.close()

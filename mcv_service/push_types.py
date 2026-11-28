@@ -1,14 +1,14 @@
 """Conservative classification of CourseVille push metadata.
 
 Exact title suffixes take priority; metadata and links are fallbacks.
-Announcement is a provisional mapping pending a genuine payload sample.
+Assignment, Material, Score and Announcement suffixes are verified in real payloads.
 """
 import re
 from urllib.parse import parse_qs, urlsplit
 
 PUSH_TYPES = {
     'push_assignment': 'CourseVille: assignments',
-    'push_announcement': 'CourseVille: announcements (unverified suffix)',
+    'push_announcement': 'CourseVille: announcements',
     'push_material': 'CourseVille: learning materials',
     'push_score': 'CourseVille: scores',
     'push_other': 'CourseVille: other / unrecognized updates',
@@ -32,8 +32,7 @@ def classify_push(payload):
     for key in ('notification', 'data'):
         if isinstance(payload.get(key), dict):
             containers.append(payload[key])
-    # Observed suffixes: Assignment, Material, Score.
-    # ASSUMPTION: Announcement uses the same suffix format; not yet observed.
+    # Observed suffixes: Assignment, Material, Score, Announcement.
     # Match only the final standardized label, never arbitrary words in the title.
     for container in containers:
         title = container.get('title')

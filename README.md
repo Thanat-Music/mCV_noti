@@ -9,6 +9,7 @@ Personal CourseVille assignment notifications for a Raspberry Pi, delivered thro
 - [LINE commands and notification settings](docs/notifications.md)
 - [SSH dashboard, user administration and signup](docs/admin.md)
 - [LLM handoff index and development diary](docs/llm/README.md)
+- [Publish and update the Pi](docs/update.md)
 - `mcv_service/__main__.py`: application entry point and scheduling
 - `mcv_service/engine.py`: assignment changes and reminder rules
 - `receiver/courseville.py`: CourseVille subscription and assignment API

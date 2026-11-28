@@ -1,5 +1,6 @@
 """Transactional snapshots, reminder generations, and a durable LINE outbox."""
 import json
+import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 from .push_types import PUSH_TYPES, classify_push
@@ -42,6 +43,7 @@ def normalize(courses):
 class Engine:
     def __init__(self, store):
         self.store, self.db = store, store.db
+        self.delivery_ready = asyncio.Event()
         self.db.executescript('''
             CREATE TABLE IF NOT EXISTS app_items (
                 id TEXT PRIMARY KEY, data TEXT NOT NULL, generation INTEGER NOT NULL,
@@ -87,13 +89,8 @@ class Engine:
             for channel, version, raw in self.db.execute(
                     "SELECT channel,version,payload FROM push_inbox WHERE state='pending'").fetchall():
                 payload = json.loads(raw)
-                notification = payload.get("notification")
-                content = notification if isinstance(notification, dict) else payload
-                parts = [content.get("title"), content.get("body"), content.get("message")]
-                text = "CourseVille notification\n" + "\n".join(v[:4000] for v in parts if isinstance(v, str) and v)
-                if text == "CourseVille notification\n":
-                    text += "A course update was received. Open CourseVille for details."
                 kind = classify_push(payload)
+                text = json.dumps({"_flex_push": payload}, ensure_ascii=False)
                 self._queue("push:" + channel + ":" + version, kind, [], now, text=text)
 
     def _meta(self, name, value):
@@ -104,6 +101,7 @@ class Engine:
     def _queue(self, dedupe, kind, refs, now, expires=None, text=None):
         self.db.execute("INSERT OR IGNORE INTO app_outbox(id,dedupe,kind,refs,text,retry_key,created,expires) VALUES(?,?,?,?,?,?,?,?)",
                         (str(uuid.uuid4()), dedupe, kind, json.dumps(refs), text, str(uuid.uuid4()), now, expires))
+        self.delivery_ready.set()
 
     @staticmethod
     def eligible(item, now):
@@ -184,16 +182,18 @@ class Engine:
                 self.db.execute("UPDATE app_outbox SET state='cancelled' WHERE id=?", (out_id,))
             return None
         if kind == "homework" and text is None:
-            from .flex import assignment_messages
+            from .flex import assignment_messages, notice_messages
             items = sorted(self.homework(now), key=lambda item: (item["due"], item["id"]))
             label = "Homework: today through 7 days ahead (Bangkok)"
             last = self.store.get("last_refresh")
             if last is None:
-                messages = [{"type": "text", "text": "No assignment data saved yet. Homework will be available after the next successful scheduled or push update."}]
+                messages = notice_messages("homework", "No assignment data saved yet. Homework will be available after the next successful scheduled or push update.")
             else:
                 updated = datetime.fromtimestamp(last, BANGKOK).strftime("%d %b %Y %H:%M Bangkok")
-                messages = [{"type": "text", "text": "Homework from saved data. Last update: " + updated}]
-                messages.extend(assignment_messages(items, label, now))
+                note = "Saved data · Last update: " + updated
+                if self.store.get("refresh_failed", False):
+                    note = "Refresh delayed · " + note
+                messages = assignment_messages(items, label, now, kind="homework", note=note)
             text = json.dumps(messages)
             with self.db:
                 self.db.execute("UPDATE app_outbox SET text=? WHERE id=?", (text, out_id))
@@ -238,18 +238,33 @@ class Engine:
         row = self.db.execute("SELECT kind,refs FROM app_outbox WHERE id=?", (out_id,)).fetchone()
         if row[0] == "homework":
             return json.loads(text)
-        from .flex import assignment_messages
+        from .flex import assignment_messages, notice_messages, push_messages
         refs = json.loads(row[1])
-        if not refs:
-            return [{"type": "text", "text": text[i:i+2000]} for i in range(0, len(text), 2000)]
         cache_key = "flex:" + out_id
         cached = self.store.get(cache_key)
         if cached and cached["text"] == text:
             return cached["messages"]
+        if not refs:
+            kind = "push_other" if row[0] == "courseville_push" else row[0]
+            if kind in NOTIFICATION_TYPES:
+                try:
+                    envelope = json.loads(text)
+                except (ValueError, TypeError):
+                    envelope = None
+                if isinstance(envelope, dict) and isinstance(envelope.get("_flex_push"), dict):
+                    messages = push_messages(kind, envelope["_flex_push"])
+                    self.store.put(cache_key, {"text": text, "messages": messages})
+                    return messages
+                clean = text.removeprefix("CourseVille notification\n")
+                title, separator, body = clean.partition("\n")
+                messages = notice_messages(kind, body if separator else clean,
+                                           title=title if separator else None)
+                self.store.put(cache_key, {"text": text, "messages": messages})
+                return messages
+            return [{"type": "text", "text": text[i:i+2000]} for i in range(0, len(text), 2000)]
         items = [json.loads(self.db.execute("SELECT data FROM app_items WHERE id=?", (ref["id"],)).fetchone()[0]) for ref in refs]
-        messages = assignment_messages(items, text.split("\n")[0], now)
-        if "last successful update" in text:
-            messages.insert(0, {"type": "text", "text": text.split("\n")[-1]})
+        note = text.split("\n")[-1] if "last successful update" in text else None
+        messages = assignment_messages(items, text.split("\n")[0], now, kind=row[0], note=note)
         self.store.put(cache_key, {"text": text, "messages": messages})
         return messages
 

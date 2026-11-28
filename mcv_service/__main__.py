@@ -14,7 +14,8 @@ from receiver.courseville import legacy_account, login
 from receiver.logging import configure, event
 from receiver.store import Store, ReceiverLock
 from .engine import Engine, BANGKOK
-from .line import Line, DeliveryError
+from .line import Line
+from .delivery import deliver_pending, delivery_worker
 
 
 def credentials(args):
@@ -36,6 +37,7 @@ async def daemon(args, managed_stop=None, on_ready=None):
         store = Store(args.database)
         stop = managed_stop or asyncio.Event()
         receiver_task = None
+        delivery_task = None
         web_runner = None
         try:
             engine = Engine(store)
@@ -44,6 +46,8 @@ async def daemon(args, managed_stop=None, on_ready=None):
             if args.send and (not token or not recipient):
                 raise RuntimeError("line_credentials_missing")
             sender = Line(token, recipient)
+            if args.send and not args.once:
+                delivery_task = asyncio.create_task(delivery_worker(engine, sender, stop))
             if on_ready:
                 on_ready(engine, recipient)
             loop = asyncio.get_running_loop()
@@ -69,6 +73,9 @@ async def daemon(args, managed_stop=None, on_ready=None):
                 await web_runner.setup()
                 await web.TCPSite(web_runner, "127.0.0.1", args.port).start()
             while not stop.is_set():
+                if delivery_task and delivery_task.done():
+                    await delivery_task
+                    raise RuntimeError("delivery_worker_stopped")
                 now = time.time()
                 local = datetime.fromtimestamp(now, BANGKOK)
                 day = local.date().isoformat()
@@ -111,20 +118,8 @@ async def daemon(args, managed_stop=None, on_ready=None):
                 engine.morning(time.time())
                 if now-store.get("retention_at", 0) >= 86400:
                     engine.retention(now)
-                if args.send:
-                    for row in engine.pending(time.time()):
-                        prepared = engine.prepare(row, time.time())
-                        if not prepared:
-                            continue
-                        out_id, text, retry_key = prepared
-                        try:
-                            await asyncio.to_thread(sender.send, engine.delivery_messages(out_id, text, time.time()), retry_key)
-                            engine.accepted(out_id)
-                            event("delivery.accepted")
-                        except Exception as exc:
-                            engine.failed(out_id, time.time(), isinstance(exc, DeliveryError) and exc.permanent)
-                            event("delivery.failed", logging.ERROR, error_type=type(exc).__name__,
-                                  status=getattr(exc, "status", None))
+                if args.send and args.once:
+                    await deliver_pending(engine, sender, stop)
                 if args.once:
                     if store.get("refresh_failed", False):
                         raise RuntimeError("one_shot_refresh_failed")
@@ -143,6 +138,12 @@ async def daemon(args, managed_stop=None, on_ready=None):
                 except TimeoutError:
                     receiver_task.cancel()
                     await asyncio.gather(receiver_task, return_exceptions=True)
+            if delivery_task:
+                try:
+                    await asyncio.wait_for(asyncio.gather(delivery_task, return_exceptions=True), timeout=35)
+                except asyncio.TimeoutError:
+                    delivery_task.cancel()
+                    await asyncio.gather(delivery_task, return_exceptions=True)
             store.close()
 
 
